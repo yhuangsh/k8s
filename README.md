@@ -1,5 +1,17 @@
-# k8s
-Kubernetes experiments on Alibaba Cloud
+# Kubernetes Experiments on Alibaba Cloud
+
+1. Setup 3-node cluster on Alibaba's cloud
+
+   1. What's needed
+   2. How to get images that are blocked by GFW
+   3. Step by step guide
+   
+2. Install and use Helm
+3. Install Kong Ingress Controller/API Gateway
+4. Install a small nodejs application
+5. Secure nodejs application with TLS and certificates
+
+## Setup 3-node cluster on Alibaba's cloud
 
 This is a step by step guide of setting up a 3-node Kubernetes cluster on Alibaba Cloud.
 
