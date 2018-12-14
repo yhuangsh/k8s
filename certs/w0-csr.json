@@ -1,5 +1,9 @@
 {
-  "CN": "m0.davidhuang.top",
+  "CN": "system:node:w0",
+  "hosts": [
+    "w0",
+    "172.17.94.121"
+  ],
   "key": {
     "algo": "rsa",
     "size": 2048
@@ -8,8 +12,8 @@
     {
       "C": "CN",
       "L": "Shanghai",
-      "O": "David Huang",
-      "OU": "CA",
+      "O": "system:nodes",
+      "OU": "workers",
       "ST": "Shanghai"
     }
   ]

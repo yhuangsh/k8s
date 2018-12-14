@@ -1,5 +1,5 @@
 {
-  "CN": "m0.davidhuang.top",
+  "CN": "admin",
   "key": {
     "algo": "rsa",
     "size": 2048
@@ -8,8 +8,8 @@
     {
       "C": "CN",
       "L": "Shanghai",
-      "O": "David Huang",
-      "OU": "CA",
+      "O": "system:masters",
+      "OU": "admin",
       "ST": "Shanghai"
     }
   ]
