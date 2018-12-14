@@ -1,0 +1,22 @@
+{
+    "CN": "kubernetes",
+    "hosts": [
+        "m0", "m0.davidhuang.top", "172.17.59.89", "39.96.71.167",
+        "m1", "172.17.94.123", 
+        "m2", "172.17.197.159",
+        "127.0.0.1", "kubernetes.local"
+    ],
+    "key": {
+      "algo": "rsa",
+      "size": 2048
+    },
+    "names": [
+      {
+        "C": "CN",
+        "L": "Shanghai",
+        "O": "David Huang",
+        "OU": "masters",
+        "ST": "Shanghai"
+      }
+    ]
+  }

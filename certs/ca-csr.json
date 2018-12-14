@@ -1,0 +1,16 @@
+{
+  "CN": "m0.davidhuang.top",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "L": "Shanghai",
+      "O": "David Huang",
+      "OU": "CA",
+      "ST": "Shanghai"
+    }
+  ]
+}
