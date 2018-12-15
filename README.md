@@ -7,8 +7,11 @@
    3. Step by step guide
    
 2. Install and use Helm
-3. Install Kong Ingress Controller/API Gateway
+
+3. Install nginx-ingress controll
+
 4. Install a small nodejs application
+
 5. Secure nodejs application with TLS and certificates
 
 ## Setup 3-node cluster on Alibaba's cloud
@@ -254,5 +257,33 @@ spec:
 
 
 use helm install
+
+## Install nginx-ingress controll
+
+The default helm nginx-ingress chart will install the ingress controller using LoadBalancer. It does not work for 
+our 3-node cluster as we don't have driver for Alibaba cloud's load balancer. 
+
+We need to install as a node port service type.
+
+```
+helm install stable/nginx-ingress \
+  --name dvd \
+  --set controller.service.type=NodePort \
+  --set controller.service.nodePorts.http=30080 \
+  --set controller.service.nodePorts.https=30443
+```
+
+Use `kubectl get svc` to verify nginx-ingress is up and running. You should see output similar to the following
+
+```
+NAME                                TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+dvd-nginx-ingress-controller        NodePort    10.97.109.150    <none>        80:30080/TCP,443:30443/TCP   17s
+dvd-nginx-ingress-default-backend   ClusterIP   10.99.0.51       <none>        80/TCP                       17s
+```
+
+You should use your release name to replace `dvd` and your own ports to replace `30080` and `30443`, although I
+found these are pretty good, given you cannot expose port `80` and `443` when ingress is configured to use node 
+port.
+
 
 

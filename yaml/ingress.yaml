@@ -1,0 +1,25 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: dvd-ingress
+spec:
+  rules:
+  - host: nodejs.davidhuang.top
+    http:
+      paths: 
+      - path: /
+        backend:
+          serviceName: nodejs
+          servicePort: 3000
+  - host: jenkins.davidhuang.top
+    http:
+      paths: 
+      - path: /
+        backend:
+          serviceName: jenkins
+          servicePort: 8080
+
