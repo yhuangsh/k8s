@@ -18,7 +18,7 @@ scp bin/etcd bin/etcdctl \
     m0:/home/huang/_bin
 scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-controller-manager.kubeconfig \
-    kube-scheduler.kubeconfig \
+    kubeconfig/kube-scheduler.kubeconfig \
     m0:/home/huang/_kubeconfig
 
 scp certs/out/* m1:/home/huang/_certs
@@ -27,7 +27,7 @@ scp bin/etcd bin/etcdctl \
     m1:/home/huang/_bin
 scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-controller-manager.kubeconfig \
-    kube-scheduler.kubeconfig \
+    kubeconfig/kube-scheduler.kubeconfig \
     m1:/home/huang/_kubeconfig
 
 scp certs/out/* m2:/home/huang/_certs
@@ -36,6 +36,6 @@ scp bin/etcd bin/etcdctl \
     m2:/home/huang/_bin
 scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-controller-manager.kubeconfig \
-    kube-scheduler.kubeconfig \
+    kubeconfig/kube-scheduler.kubeconfig \
     m2:/home/huang/_kubeconfig
 
