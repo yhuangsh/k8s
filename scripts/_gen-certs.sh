@@ -2,7 +2,8 @@
 
 CERTSDIR=certs
 
-rm $CERTSDIR/out/*
+rm -fR $CERTSDIR
+mkdir -p $CERTSDIR/out
 
 # Generate the self-signed CA certificate. 
 # It will be used to sign/verify all other certificates
