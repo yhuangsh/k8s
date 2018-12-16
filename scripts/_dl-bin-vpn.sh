@@ -8,5 +8,6 @@ URL=https://storage.googleapis.com/kubernetes-release/release/${KUBE_VER}/bin/li
 curl -i -L ${URL}/kube-apiserver -o bin/kube-apiserver
 curl -i -L ${URL}/kube-controller-manager -o bin/kube-controller-manager
 curl -i -L ${URL}/kube-scheduler -o bin/kube-scheduler
+curl -i -L ${URL}/kubectl -o bin/kubectl
 
-chmod +x bin/kube-apiserver bin/kube-controller-manager bin/kube-scheduler
+chmod +x bin/kube-apiserver bin/kube-controller-manager bin/kube-scheduler bin/kubectl
