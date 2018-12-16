@@ -6,6 +6,7 @@ M2_IP=172.17.197.159
 ETCD_NAME=m0
 INTERNAL_IP=$M0_IP
 
+mkdir -p /home/huang/_scripts/out
 cat <<EOF | tee _scripts/out/etcd.service
 [Unit]
 Description=etcd
