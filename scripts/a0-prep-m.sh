@@ -22,6 +22,7 @@ scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-scheduler.kubeconfig \
     m0:/home/huang/_kubeconfig
 scp yaml/* m0:/home/huang/_yaml
+scp scripts/m-* m0:/home/huang/_scripts
 scp scripts/m0* m0:/home/huang/_scripts
 
 echo "Copying files to m1"
@@ -31,6 +32,7 @@ scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-scheduler.kubeconfig \
     m1:/home/huang/_kubeconfig
 scp yaml/* m1:/home/huang/_yaml
+scp scripts/m-* m0:/home/huang/_scripts
 scp scripts/m1* m1:/home/huang/_scripts
 
 echo "Copying files to m2"
@@ -40,5 +42,6 @@ scp kubeconfig/admin.kubeconfig \
     kubeconfig/kube-scheduler.kubeconfig \
     m2:/home/huang/_kubeconfig
 scp yaml/* m2:/home/huang/_yaml
+scp scripts/m-* m0:/home/huang/_scripts
 scp scripts/m2* m2:/home/huang/_scripts
 
