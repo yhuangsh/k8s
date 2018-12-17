@@ -11,7 +11,7 @@ sudo cp \
     /var/lib/kubernetes
 sudo cp \
     _kubeconfig/kube-controller-manager.kubeconfig \
-    _kubeconifg/kube-scheduler.kubeconfig \
+    _kubeconfig/kube-scheduler.kubeconfig \
     /var/lib/kubernetes/
 
 # Setup Kubernetes' own config file location
