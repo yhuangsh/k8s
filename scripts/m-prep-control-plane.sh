@@ -9,8 +9,8 @@ sudo cp \
     _certs/service-account.pem _certs/service-account-key.pem \
     _yaml/encryption-config.yaml \
     /var/lib/kubernetes
-sudo cp \ 
-    _kubeconifg/kube-controller-manager.kubeconfig \
+sudo cp \
+    _kubeconfig/kube-controller-manager.kubeconfig \
     _kubeconifg/kube-scheduler.kubeconfig \
     /var/lib/kubernetes/
 
@@ -24,5 +24,5 @@ echo "Setting up /etc/systemd/system"
 sudo cp \
     _scripts/out/kube-apiserver.service \
     _scripts/out/kube-controller-manager.service \
-    _Scripts/out/kube-scheduler.service \
+    _scripts/out/kube-scheduler.service \
     /etc/systemd/system
