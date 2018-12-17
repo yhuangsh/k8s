@@ -5,15 +5,8 @@ M1_IP=172.17.94.123
 M2_IP=172.17.197.159
 INTERNAL_IP=$M0_IP
 
-sudo mkdir -p /var/lib/kubernetes/
-sudo mv 
-    _certs/ca.pem _certs/ca-key.pem 
-    _certs/kub-apiserver.pem _certs/kube-apiserver-key.pem \
-    _certs/service-account.pem _certs/service-account-key.pem \
-    _yaml/encryption-config.yaml /var/lib/kubernetes/
-
 mkdir -p /home/huang/_scripts/out
-cat <<EOF | sudo tee _script/out/kube-apiserver.service
+cat <<EOF | tee _scripts/out/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes/kubernetes
@@ -46,8 +39,8 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --service-account-key-file=/var/lib/kubernetes/service-account.pem \\
   --service-cluster-ip-range=10.32.0.0/24 \\
   --service-node-port-range=30000-32767 \\
-  --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \\
-  --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \\
+  --tls-cert-file=/var/lib/kubernetes/kube-apiserver.pem \\
+  --tls-private-key-file=/var/lib/kubernetes/kube-apiserver-key.pem \\
   --v=2
 Restart=on-failure
 RestartSec=5
