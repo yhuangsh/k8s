@@ -26,3 +26,11 @@ sudo cp \
     _scripts/out/kube-controller-manager.service \
     _scripts/out/kube-scheduler.service \
     /etc/systemd/system
+
+# Copy kube-* binaries
+echo "Copying binaries to /usr/local/bin"
+sudo cp \
+    _bin/kube-apiserver \
+    _bin/kube-controller-manager \
+    _bin/kube-scheduler \
+    /usr/local/bin
