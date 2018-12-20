@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Run this script on masters 
+sudo cp _bin/etcd _bin/etcdctl /usr/local/bin
 sudo mkdir -p /etc/etcd /var/lib/etcd
 sudo cp \
   _certs/ca.pem _certs/ca-key.pem \
