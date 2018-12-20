@@ -9,3 +9,5 @@ docker pull k8s.gcr.io/kube-proxy:${KUBE_VER}
 docker pull k8s.gcr.io/pause:3.1 
 docker pull k8s.gcr.io/etcd:3.2.24 
 docker pull k8s.gcr.io/coredns:1.2.6 
+docker pull weaveworks/weave-kube:2.5.0
+docker pull weaveworks/weave-npc:2.5.0
