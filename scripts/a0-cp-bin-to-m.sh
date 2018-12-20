@@ -5,9 +5,9 @@ ssh m0 mkdir -p /home/huang/_bin
 scp bin/* m0:/home/huang/_bin
 
 echo "Copying binary files to m1"
-ssh m0 mkdir -p /home/huang/_bin
+ssh m1 mkdir -p /home/huang/_bin
 scp bin/* m1:/home/huang/_bin
 
 echo "Copying binary files to m2"
-ssh m0 mkdir -p /home/huang/_bin
+ssh m2 mkdir -p /home/huang/_bin
 scp bin/* m2:/home/huang/_bin
