@@ -15,10 +15,10 @@ Documentation=https://github.com/coreos
 [Service]
 ExecStart=/usr/local/bin/etcd \\
   --name ${ETCD_NAME} \\
-  --cert-file=/etc/etcd/kube-apiserver.pem \\
-  --key-file=/etc/etcd/kube-apiserver-key.pem \\
-  --peer-cert-file=/etc/etcd/kube-apiserver.pem \\
-  --peer-key-file=/etc/etcd/kube-apiserver-key.pem \\
+  --cert-file=/etc/etcd/kubernetes.pem \\
+  --key-file=/etc/etcd/kubernetes-key.pem \\
+  --peer-cert-file=/etc/etcd/kubernetes.pem \\
+  --peer-key-file=/etc/etcd/kubernetes-key.pem \\
   --trusted-ca-file=/etc/etcd/ca.pem \\
   --peer-trusted-ca-file=/etc/etcd/ca.pem \\
   --peer-client-cert-auth \\
