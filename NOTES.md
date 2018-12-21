@@ -28,3 +28,4 @@ data:
 
 Here I only give Metallb one IP address that has internet access to start with. 
 
+Put all of your vms in one security group and open up TCP:6783, UDP:6783/6784
