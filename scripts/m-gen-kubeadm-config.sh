@@ -12,6 +12,8 @@ kind: ClusterConfiguration
 kubernetesVersion: stable
 apiServerCertSANs:
 - ${A0_IP}
+- a0.davidhuang.top
+- a0
 controlPlaneEndpoint: "${A0_IP}:6443"
 etcd:
   external:
