@@ -1,8 +1,8 @@
 #!/bin/sh
 
-ssh m0 mkdir -p /home/huang/_scripts
-ssh m1 mkdir -p /home/huang/_scripts
-ssh m2 mkdir -p /home/huang/_scripts
+ssh w0 mkdir -p /home/huang/_scripts
+ssh w1 mkdir -p /home/huang/_scripts
+ssh w2 mkdir -p /home/huang/_scripts
 
 echo "Copying certs and scripts files to w0"
 scp scripts/w-* w0:/home/huang/_scripts
