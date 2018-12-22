@@ -1,119 +1,148 @@
 # Kubernetes Experiments on Alibaba Cloud
 
-1. Setup 3-node cluster on Alibaba's cloud
+This project uses a serious of scripts to setup a 3-master, 3-worker Kubernetes cluster on Alibaba's Aliyun Cloud using 7 standard Aliyun ECS machines. 
 
-   1. What's needed
-   2. How to get images that are blocked by GFW
-   3. Step by step guide
-   
-2. Install and use Helm
+## ECS resources used are:
 
-3. Install nginx-ingress controll
+- a0 node, bridge and working node for settting up the cluster master and worker nodes and also act as soft load balancer and reverse proxy to Kubernetes API servers running on the master
+- m0, m1, m2 nodes, master nodes running the cluster's control plane 
+- w0, w1, w2 nodes, wokers nodes running the application pods
 
-4. Install a small nodejs application
+- a0, w0, w1, w2 are provisioned with public IPs (EIP or fixed), so they have internet access
+- m0, m1 m2 are provisioned with cloud internal IPs only
 
-5. Secure nodejs application with TLS and certificates
+- a0 is provisioned with 1 CPU, 0.5 GiB, (ecs.t5-lc2m1.nano)
+- m0, m1, m2, w0, w1, w2 are provisioned with 1 CPU, 1 GiB RAM (ecs.t5-lc1m1.small)
 
-## Setup 3-node cluster on Alibaba's cloud
+- Make sure all the VMs are in one security group
+- Mare sure the following ports are open within your clusters. Aliyun default only opens port 22, 80 and 433
+  - TCP port 6443, this is for the Kubernetes API server
+  - TCP port 6873 and UDP ports 6873/6874, these are for Weave Net pod network drivers
 
-This is a step by step guide of setting up a 3-node Kubernetes cluster on Alibaba Cloud.
+- All nodes are provisioned with default/minimal settings for other resources (I/O, bandwidth, disk, etc.)
+- All nodes are running Ubuntu 16.04 LTS (Xenial)
+- All nodes must be in one region, but can spread across difference availability zones. This experiment puts master nodes on 3 different availablility zones
 
-Bill of Materials
+This is the probably the cheapest possible configuration for this experiment. If you use these resources plus 4 public IPs, it'll cost you about 100 RMB for 1 week, about 3000 RMB for a year. As a comparison, if you use Aliyun's managed Kubernetes cluster with the same 3-master-3-worker setup with lowest possible configuration ecs.n1.medium (2 CPU, 4 GiB), it'll cost you about 2000 RMB per node a year, that's 12,000 RMB a year just for the VMs. Of course, how much workload can a 3000-RMB cluster take remains to be seen and will be covered by future experiments. My guts feeling is this is a good base and with Kubernetes you will be able to horizontally scale your cluster little by little
 
-- 3x ecs.t5.lc1m1.small nodes, 1x vCPU, 1 GiB RAM. This is cheapest VM you can buy on Alibaba Cloud
-- Ubuntu 16.04 LTS, standard Ubuntu image when you create the node instances
-- Kubernetes v1.12.2, most of the images from k8s.gcr.io
-- Weave Net network drivers for Kubernetes cluster
-- Docker 17.03.2-ce, comes with Alibaba Cloud's Ubuntu xenial distribution
+I've tested that master nodes won't run in a 0.5 GiB configuration. Whether worker nodes can is something you can try. 
 
-The GFW Challenge
+Besides, your local machine will be used in the set up process and when the setup is done your local machine will be set up to do kubectl to administrate the cluster remotely. Because this experiment uses bash scripts a Mac or Linux machine is recommended.
 
-There are many guides on internet teaching you how to set up a single-master Kubernetes cluster. 
-They are all good. But the challenge here is that Kubernetes's core binaries and its needed images
-are hosted on Google's servers which are blocked by The Great Fire Wall. This guide is mostly about
-working around the GFW while generally following the same method as many good guides have laid out. 
+## Preparation on local machine
 
-What's Blocked and Needed
+The setup process uses a serious of bash scripts. Scripts starting with 
+- `_` are the ones run on your local machine
+- `a0` are the ones run on your a0 node
+- `m-` are the ones run on each of your master nodes
+- `m0-`, `m1-`, `m-2` are the ones run on designated master nodes
+- `w-` are the ones run on each of you worker nodes 
 
-Google's apt key hosted on: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+In order to run the scripts, just do `git clone https://github.com/yhuangsh/k8s && cd k8s`. The scripts are supposed to run from `k8s`'s git root. The paths in the following sections are all relative to this git root unless otherwise specified.
 
-  We will not need it if you use the steps in this guide.
+### Install tools that run on your local machine
 
-Kubernetes core binaries in deb packages hosted on: http://apt.kubernetes.io/
+Tools you need to install and run on your local machine are:
+- `docker`, download and instal Docker for Mac Community Edition. `brew install docker` should also work, but Docker for Mac CE was the one I used. YMMV.
+- `cfssl`, download from cfssl's github or use `brew install cfssl`
+- `kubectl`, install with `brew install kubernetes-cli` or download from Google's official 
 
-  cri-tools_1.12.0-00_amd64.deb               socat_1.7.3.1-1_amd64.deb
-  kubelet_1.12.3-00_amd64.deb                 kubernetes-cni_0.6.0-00_amd64.deb
-  kubeadm_1.12.3-00_amd64.deb                 kubectl_1.12.3-00_amd64.deb
+### Download ETCD binary
 
-Docker images that will be pulled when kubeadm or kubeelet starts. 
-  
-  k8s.gcr.io/coredns:1.2.2                    k8s.gcr.io/kube-scheduler:v1.12.3
-  k8s.gcr.io/etcd:3.2.24                      k8s.gcr.io/pause:3.1
-  k8s.gcr.io/kube-apiserver:v1.12.3           weaveworks/weave-kube:2.5.0
-  k8s.gcr.io/kube-controller-manager:v1.12.3  weaveworks/weave-npc:2.5.0
-  k8s.gcr.io/kube-proxy:3.1
+Run the script `_dl-etcd.sh` to download the `etcd` and `etcdctl` binaries. The donwloaded files will be put in `bin/download`. 
 
-WeaveWorks's YAML config file for setting up the pod_networks. This file is not blocked. Many 
-existing guides uses a complex bash command to pull directly from WeaveWork's website passing
-the Kubernetes version string on the localhost. With our specific guide, you could just use 
-the one from this project. It was pulled and save the same way.
+### Pull and save Kubenetes docker images
 
-  weaveworks.yaml
+Run the script `_pull-kubeadm-images.sh`. This script pulls the official Kubernetes images that `kubelet` will need to run master and worker nodes alike, plus the two Weave Net images that will drive the pod network withint the clusters. 
 
-Steps
+Note that the images are hosted on Google servers. Make sure there is an active **VPN connection** if run from within China mainland. 
 
-Create an ECS instance and do basic setup. Among other things create a user that can sudo. 
+Run the script `_save-kubeadm-images.sh`. This script dumps the pulled images and save them into a local binary file, so we can copy them to the Aliyun nodes.
 
-Git clone this project, you will have all the .deb files and images in your local machine. Use 
-scp to copy all .deb and image files to your node. 
+### Generate certificates
 
-You could also install git on your ECS instance and do git clone there. This should be faster
-than scp, but your ECS instance is somewhat less pure. Choose either way to your liking.
+Run the script `_gen-certs.sh`. This script generates the CA and the core certificate for your master nodes and will be used by `etcd` and `kubeadm` to set up security for your ETCD and Kubernetes cluster.
 
-Ssh into the node and do: sudo dpkg -i <each deb file>. When you use dpkg, the dependency
-packages are not automatically installed. Just use the standard sudo apt-get install command
-to installed the dependencies, then retry dpkg -i. 
+Make sure you **change the IP address variables** in this script to reflect your set up.
 
-# Make sure we have a up-to-date clean Ubuntu
-sudo apt-get update
-sudo apt-get upgrade
-sudo apt-get autoremove
-sudo reboot
+### Copy files to a0
 
-# Install Kubernetes core binaries and dependencies
-# You could run install_bin.sh 
-sudo apt-get install docker.io
-sudo dpkg -i kubernetes-cni_0.6.0-00_amd64.deb
-sudo dpkg -i kubectl_1.12.3-00_amd64.deb
-sudo dpkg -i cri-tools_1.12.0-00_amd64.deb
-sudo dpkg -i socat_1.7.3.1-1_amd64.deb 
-sudo apt-get install ebtables                     # MUST be installed after cri-tools and socat
-sudo dpkg -i kubelet_1.12.3-00_amd64.deb
-sudo dpkg -i kubeadm_1.12.3-00_amd64.deb
+Change `_cp-bin-to-a0.sh` and `_cp-certs0to-a0.sh` scripts so they use your a0 and master nodes' host names. 
 
-# Load docker images needed for kubeadm init
-# You could run load_master_images.sh
-sudo docker load < k8s.gcr.io_coredns_1.2.2
-sudo docker load < k8s.gcr.io_etcd_3.2.24
-sudo docker load < k8s.gcr.io_kube-apiserver_v1.12.3
-sudo docker load < k8s.gcr.io_kube-controller-manager_v1.12.3
-sudo docker load < k8s.gcr.io_kube-proxy_3.1
-sudo docker load < k8s.gcr.io_kube-scheduler_v1.12.3
-sudo docker load < k8s.gcr.io_pause_3.1
-sudo docker load < weaveworks_weave-kube_2.5.0
-sudo docker load < weaveworks_weave-npc_2.5.0
+SSH to a0 and do `git clone https://github.com/yhuangsh/k8s`. 
 
-# Now start the node as Kubernetes master
-sudo kubeadm init
-# IMPORTANT: save the kubeadm join ... line into a file
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-kubectl apply -f weaveworks.yaml
+Run the scripts, still on your local machine, `_cp-bin-to-a0.sh` and `_cp-certs-to-a0.sh`. This script copies binaries and certificates files to your a0 node.
 
-# Check if the master is up running
-kubectl get nodes
+## Preparation on a0 node
 
+You should have cloned this repository on your a0 node and have the `bin/` and `certs` directories under your git root populated.
+
+### Download Kubernetes core binaries  
+
+Kubernetes core binaries and dependencies are not part of standard Ubuntu distribution. They are hosted on Google's storage which cannot be access without VPN. To workaround, we use a mirror from UTSC. 
+
+Add below line to `/etc/apt/sources.list.d/kubernetes.list` on your a0 node:
+```
+deb http://mirrors.ustc.edu.cn/kubernetes/apt kubernetes-xenial main
+```
+ 
+Note that this source is unauthenticated. UTSC is a well-known and credible university in China. And their mirror is updated very frequently and always have the latest Kubernetes packages. If you know another mirror in China that's authenticated, please let me know.
+
+Once the UTSC source is set, download the following packages:
+
+```
+cd bin
+sudo apt-get download --allow-unauthenticated \
+  cri-tools_1.12.0-00_amd64.deb \
+  ebtables_2.0.10.4-3.4ubuntu2.16.04.2_amd64.deb \
+  kubeadm_1.13.1-00_amd64.deb \
+  kubectl_1.13.1-00_amd64.deb \
+  kubelet_1.13.1-00_amd64.deb \
+  kubernetes-cni_0.6.0-00_amd64.deb \
+  socat_1.7.3.1-1_amd64.deb 
+```
+
+*TODO: make the above into a script*.
+
+At this point, your `bin/` directory should have all the `.deb` file and the docker images copied from your local machine, something like this:
+
+```
+user@host:~/k8s$ ls bin
+coredns_1.2.6
+cri-tools_1.12.0-00_amd64.deb
+ebtables_2.0.10.4-3.4ubuntu2.16.04.2_amd64.deb
+etcd
+etcd_3.2.24
+etcdctl
+kubeadm_1.13.1-00_amd64.deb
+kube-apiserver_v1.13.1
+kube-controller-manager_v1.13.1
+kubectl_1.13.1-00_amd64.deb
+kubelet_1.13.1-00_amd64.deb
+kube-proxy_v1.13.1
+kubernetes-cni_0.6.0-00_amd64.deb
+kube-scheduler_v1.13.1
+pause_3.1
+socat_1.7.3.1-1_amd64.deb
+weaveworks_weave-kube_2.5.0
+weaveworks_weave-npc_2.5.0
+```
+
+The `etcd_3.2.23` image is actually not needed as we will set up a etcd cluster manually. I'm using a higher version of ETCD for this experiment. This image is used by kubelet and kubeadm if you start a single master cluster. I put it here for reason of completeness.
+
+### Copy files from a0 to master and worker nodes
+
+Run scripts `a0-cp-bin-to-m.sh`, `a0-cp-to-m.sh`, `a0-cp-bin-to-w.sh`, `a0-cp-to-w.sh`. These scripts will copy the files needed for setting up master and workers nodes. Make sure you change the hostnames, IP address, diretories, etc, in the following scripts before running them. 
+
+## Set up master nodes, m0, m1, m2
+
+All of your master nodes should now have `_bin`, `_certs`, `_scripts`, `_yaml` directories under the home directory
+
+### Set up m0
+
+SSH from a0 to m0. 
+
+Run the script `m0-gen-etcd.service.sh`. This creates a `etcd.service` systemctl unit file in your `_scripts/out` directory. 
 
 # Now set up worker node, ssh to a new node you intend to use as worker
 

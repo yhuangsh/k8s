@@ -54,18 +54,18 @@ A0_IP=172.17.94.124
 M0_IP=172.17.59.89
 M1_IP=172.17.94.123
 M2_IP=172.17.197.159
-# Generate server certificate for Kube API Server. This certificate will be verified by connecting 
-# kube-* clients
+
+# Generate the self-signed CA certificate. 
+# It will be used to sign/verify all other certificates
+cfssl gencert \
+  -initca \
+  $CERTSDIR/ca-csr.json | cfssljson -bare $CERTSDIR/out/ca
+
+# Genreate the core Kubernetes certificate
+# This certificate will be used for Kubernetes and the underlying ETCD cluster
 cfssl gencert \
   -ca=$CERTSDIR/out/ca.pem \
   -ca-key=$CERTSDIR/out/ca-key.pem \
   -config=$CERTSDIR/ca-config.json \
   -hostname=${A0_IP},${M0_IP},${M1_IP},${M2_IP},127.0.0.1,kubernetes.default \
   $CERTSDIR/kubernetes-csr.json | cfssljson -bare $CERTSDIR/out/kubernetes
-
-# Generate service account 
-#cfssl gencert \
-#  -ca=$CERTSDIR/out/ca.pem \
-#  -ca-key=$CERTSDIR/out/ca-key.pem \
-#  -config=$CERTSDIR/ca-config.json \
-#  $CERTSDIR/service-account-csr.json | cfssljson -bare $CERTSDIR/out/service-account
