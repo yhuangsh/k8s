@@ -1,6 +1,6 @@
 # Kubernetes Experiments on Alibaba Cloud
 
-This project uses a serious of scripts to setup a 3-master, 3-worker Kubernetes cluster on Alibaba's Aliyun Cloud using 7 standard Aliyun ECS machines. 
+This project uses a series of scripts to setup a 3-master-3-worker Kubernetes cluster on Alibaba's Aliyun Cloud using 7 standard Aliyun ECS instances. 
 
 ## ECS resources used are:
 
@@ -14,14 +14,14 @@ This project uses a serious of scripts to setup a 3-master, 3-worker Kubernetes 
 - a0 is provisioned with 1 CPU, 0.5 GiB, (ecs.t5-lc2m1.nano)
 - m0, m1, m2, w0, w1, w2 are provisioned with 1 CPU, 1 GiB RAM (ecs.t5-lc1m1.small)
 
-- Make sure all the VMs are in one security group
-- Mare sure the following ports are open within your clusters. Aliyun default only opens port 22, 80 and 433
+- Make sure all the ECS instances are in one security group
+- Mare sure the following ports are open within your clusters. Aliyun by default only opens port 22, 80 and 433
   - TCP port 6443, this is for the Kubernetes API server
   - TCP port 6873 and UDP ports 6873/6874, these are for Weave Net pod network drivers
 
 - All nodes are provisioned with default/minimal settings for other resources (I/O, bandwidth, disk, etc.)
 - All nodes are running Ubuntu 16.04 LTS (Xenial)
-- All nodes must be in one region, but can spread across difference availability zones. This experiment puts master nodes on 3 different availablility zones
+- All nodes must be provisioned within the same region, but can spread across difference availability zones. This experiment puts master nodes on 3 different availablility zones
 
 This is the probably the cheapest possible configuration for this experiment. If you use these resources plus 4 public IPs, it'll cost you about 100 RMB for 1 week, about 3000 RMB for a year. As a comparison, if you use Aliyun's managed Kubernetes cluster with the same 3-master-3-worker setup with lowest possible configuration ecs.n1.medium (2 CPU, 4 GiB), it'll cost you about 2000 RMB per node a year, that's 12,000 RMB a year just for the VMs. Of course, how much workload can a 3000-RMB cluster take remains to be seen and will be covered by future experiments. My guts feeling is this is a good base and with Kubernetes you will be able to horizontally scale your cluster little by little
 
@@ -31,18 +31,19 @@ Besides, your local machine will be used in the set up process and when the setu
 
 ## Preparation on local machine
 
-The setup process uses a serious of bash scripts. Scripts starting with 
+The setup process uses a series of bash scripts. Scripts starting with 
 - `_` are the ones run on your local machine
 - `a0` are the ones run on your a0 node
 - `m-` are the ones run on each of your master nodes
 - `m0-`, `m1-`, `m-2` are the ones run on designated master nodes
 - `w-` are the ones run on each of you worker nodes 
 
-In order to run the scripts, just do `git clone https://github.com/yhuangsh/k8s && cd k8s`. The scripts are supposed to run from `k8s`'s git root. The paths in the following sections are all relative to this git root unless otherwise specified.
+In order to run the scripts, `git clone https://github.com/yhuangsh/k8s && cd k8s`. The scripts are supposed to run from `k8s`'s git root. The paths in the following sections are all relative to this git root unless otherwise specified.
 
 ### Install tools that run on your local machine
 
 Tools you need to install and run on your local machine are:
+- `git`, obviously
 - `docker`, download and instal Docker for Mac Community Edition. `brew install docker` should also work, but Docker for Mac CE was the one I used. YMMV.
 - `cfssl`, download from cfssl's github or use `brew install cfssl`
 - `kubectl`, install with `brew install kubernetes-cli` or download from Google's official 
@@ -136,51 +137,149 @@ Run scripts `a0-cp-bin-to-m.sh`, `a0-cp-to-m.sh`, `a0-cp-bin-to-w.sh`, `a0-cp-to
 
 ## Set up master nodes, m0, m1, m2
 
-All of your master nodes should now have `_bin`, `_certs`, `_scripts`, `_yaml` directories under the home directory
+All of your master nodes should now have `_bin`, `_certs`, `_scripts`, `_yaml` directories under the home directory. You will need to SSH from a0 node to m0, m1, m2 in the following steps as the master nodes are not accessible directly from outside of your cluster.
 
-### Set up m0
+### Install docker and load Kubernetes docker images
 
-SSH from a0 to m0. 
+1. Install docker by running something like `sudo apt-get install docker.io`.
+2. SSH from a0 to m0, m1, m2. On each master node run `m-load-kubeadm-images.sh`. This loads the docker images needed for `kubeadm` to bootstrap your cluster.
+3. SSH from a0 to w0, w1, w2. On each worker node run `w-load-kubeadm-images.sh`. This loads the docker images needed for `kubeadm` to bootstrap your cluster.
 
-Run the script `m0-gen-etcd.service.sh`. This creates a `etcd.service` systemctl unit file in your `_scripts/out` directory. 
+### Install Kubernetes core binaries
 
-# Now set up worker node, ssh to a new node you intend to use as worker
+1. SSH from a0 to m0, m1, m2, w0, w1, w2
+2. On each node, install Kubernetes core binaries using `dpkg` comamnd with `*.deb` file under `~/_bin` directory
+   ```
+   cd _bin
+   sudo dpkg -i \
+     kubernetes-cni_0.6.0-00_amd64.deb \
+     kubectl_1.13.1-00_amd64.deb \
+     cri-tools_1.12.0-00_amd64.deb \
+     socat_1.7.3.1-1_amd64.deb \
+     ebtables_2.0.10.4-3.4ubuntu2.16.04.2_amd64.deb \
+     kubelet_1.13.1-00_amd64.deb \
+     kubeadm_1.13.1-00_amd64.deb
+   ```
 
-# Same as on the master node
-# Install Kubernetes core binaries and dependencies
-sudo apt-get install docker.io
-sudo dpkg -i kubernetes-cni_0.6.0-00_amd64.deb
-sudo dpkg -i kubectl_1.12.3-00_amd64.deb
-sudo dpkg -i cri-tools_1.12.0-00_amd64.deb
-sudo dpkg -i socat_1.7.3.1-1_amd64.deb 
-sudo apt-get install ebtables                     # MUST be installed after cri-tools and socat
-sudo dpkg -i kubelet_1.12.3-00_amd64.deb
-sudo dpkg -i kubeadm_1.12.3-00_amd64.deb
+### Set up etcd cluster on master nodes
 
-# A subset of images are needed 
-# Load docker images needed for kubeadm init
-# You could run load_worker_images.sh
-sudo docker load < k8s.gcr.io_kube-proxy_3.1
-sudo docker load < k8s.gcr.io_pause_3.1
-sudo docker load < weaveworks_weave-kube_2.5.0
-sudo docker load < weaveworks_weave-npc_2.5.0
+1. SSH from a0 to m0
+2. Run the script `m0-gen-etcd.service.sh`. This creates a `etcd.service` systemctl unit file in your `_scripts/out` directory. Make sure you change the details in the script to suit your environment.
+3. Run the script `m-pre-etcd.sh`. This starts the etcd cluster on m0.
+4. Repeat the above for m1 and m2. Note that you should use `m1-gen-etcd.service.sh` and `m2-gen-etcd.service.sh` on m1 and m2 nodes.
 
-sudo kubeadm join ... # The same output from master node's kubeadm init command
+Now SSH to any of the master nodes, run the script `m-chk-etcd.sh`, you should see something like:
 
-# set up config to run kubectl on node1. This is just used once to get the pod_networking running
-mkdir -p $HOME/.kube
-scp <master node>:/home/someuser/.kube/config ~/.kube
-kubectl apply -f weaveworks.yaml
+```
+4f1559e54113e015, started, m2, https://someip:2380, https://someip:2379
+68891416ccd28cf2, started, m1, https://someip:2380, https://someip:2379
+e2c4af89fb70ae0b, started, m0, https://someip:2380, https://someip:2379
+```
 
-# Check from the master node if the worker node has jointed
-kubectl get nodes
+This shows your etcd cluster is up running. 
 
-# Now access your Kubernetes cluster on the cloud from your laptop
-# From your local machine
-scp <master node>:/home/someuser/.kube/config kubeconfig.master
-kubectl <any command and parameter> --kubeconfig=kubeconfig.master
+### Boot strap the first master node m0
 
-Install and Setup Helm
+1. SSH from a0 to m0
+2. Run the script `m-gen-kubeadm-config.sh`. This generates a `kubeadm-config.yaml` under your `~/_yaml` directory. 
+3. Run this command to bootstrap first master node. The `--ignore-preflight-errors=NumCPU` flag will make `kubeadm` to ignore that fact that our low spec instance has only 1 CPU. Without the flag, `kubeadm` preflight check will fail.
+   ```
+   sudo kubeadm init --config=_yaml/kubeadm-config.yaml --ignore-preflight-errors=NumCPU
+   ```
+4. Run the scripts `m0-cp-kube-certs-to-m1-m2.sh`. This copes the certificates generated by `kubeadm` on m0 to m1 and m2. This step is very important and makes sure the master nodes can talk to each other using the same certificates and CA.
+
+### Install HAProxy on a0 to load balance master nodes
+
+1. SSH to a0
+2. `sudo apt-get install haproxy`
+3. Config HAProxy's config file `sudo vi /etc/haproxy/haproxy.cfg`
+   ```
+   global
+   ...
+   default
+   ...
+    
+   frontend kubernetes
+   bind <a0 ip address>:6443
+   option tcplog
+   mode tcp
+   default_backend kubernetes-master-nodes
+
+
+   backend kubernetes-master-nodes
+   mode tcp
+   balance roundrobin
+   option tcp-check
+   server m0 <m0 ip address>:6443 check fall 3 rise 2
+   server m1 <m1 ip address>:6443 check fall 3 rise 2
+   server m2 <m2 ip address>:6443 check fall 3 rise 2
+   ```
+4. Restart HAProxy with `sudo systemctl restart haproxy`
+
+### Bring up the rest of the masters nodes, m1 and m2
+
+1. SSH from a0 to m1 and m2. You should see on each node's home directory there is a directory `~/pki`. This directory holds the certificates copied from m0.
+2. On each master nodes, run the script `m-prep-kubeadm-init.sh`. Do *NOT* run this script on m0. This copies the certificates generated from m0 to the proper places on m1 and m2.
+3. Run the same command to bootstrap master nodes on m1 and m2
+   ```
+   sudo kubeadm init --config=_yaml/kubeadm-config.yaml --ignore-preflight-errors=NumCPU
+   ```
+4. Make a copy of the `kubeadm join` line from the last `kubeadm` command output.
+
+## Bring up worker nodes
+
+1. SSH from a0 to w0, w1, w2
+2. Run `sudo kubeadm join ...(from the last kubeadm output from master node)...`. This will join the worker node to the cluster. 
+
+In case the `kubeadm join` line is lost, you can always make a new one by running the following command on one of the master nodes 
+```
+$ sudo kubeadm token generate
+<generated token string>
+$ sudo kubeadm token create <generated token string> --print-join-command
+```
+
+## Set up kubectl on a0 and your local machine
+
+1. SSH from a0 to m0
+2. `sudo cp -i /etc/kubernetes/admin.conf ~`. This copies the admin kubeconfig file to your home directory on m0
+3. `kubectl --kubeconfig=~/admin.conf get nodes`. This should produce something like the following. It's normal that the nodes are in `NotReady` states because we have not installed the pod network driver.
+   ```
+   NAME   STATUS      ROLES    AGE   VERSION
+   m0     NotReady    master   22h   v1.13.1
+   m1     NotReady    master   22h   v1.13.1
+   m2     NotReady    master   22h   v1.13.1
+   w0     NotReady    <none>   22h   v1.13.1
+   w1     NotReady    <none>   22h   v1.13.1
+   w2     NotReady    <none>   21h   v1.13.1
+   ``` 
+4. Exit to a0 node and run 
+   ```
+   $ scp m0:~/admin.conf .
+   $ kubectl --kubeconfig=~/admin.conf get nodes
+   ```
+   You should see the same node list output as above. This shows kubectl is working remotely on a0. 
+5. Back to you local machine and do `scp user@a0:~/admin.conf .`. This copies the `admin.conf` from a0 (was originally from m0) to your local machine.
+6. On your local machine, `vi admin.conf`, then find the `server: https://<m0 ip address>:6443` line and replace `<m0 ip address>` with a0's host@domain. 
+7. On your local machine, `kubectl --kbueconfig=~/admin.conf get nodes` should also work. If you want to make in kubeconfig as your default, copy it to `~/.kube/` and rename it to `config`. 
+
+## Bring up the Weave Net pod network
+
+1. From k8s's git root of you local machine, `kubectl apply -f yaml/weave-net.yaml`. This will create the pod network. Wait for a few minutes, then `kubectl get nodes`, you should see something like:
+   ```
+   NAME   STATUS   ROLES    AGE   VERSION
+   m0     Ready    master   22h   v1.13.1
+   m1     Ready    master   22h   v1.13.1
+   m2     Ready    master   22h   v1.13.1
+   w0     Ready    <none>   22h   v1.13.1
+   w1     Ready    <none>   22h   v1.13.1
+   w2     Ready    <none>   21h   v1.13.1
+   ```
+
+Congratulations, you've had yourself a running Kubernetes cluster with 3 master nodes and 3 worker nodes. 
+
+# Below contents are unfinished and will be changed soon.
+
+# Install and Setup Helm
 
 Install on Mac following official instructions worked
 
@@ -220,68 +319,6 @@ port 80 needs to be open for http01 verification to go through
 
 sudo certbot certonly --standalone -d davidhuang.top -d jenkins.davidhuang.top
 Once done, kc create secret tls <name> --key privkey.pem --cert fullchain.pem
-
-Install Kong
-
-Enable local storage volume in Kubernetes, if you are just using the VMs on Alibaba Cloud (same as bare-metal)
-
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: local-pv
-spec:
- capacity:
-   storage: 15Gi
- accessModes:
- - ReadWriteOnce
- persistentVolumeReclaimPolicy: Retain
- storageClassName: local-storage
- local:
-   path: /mnt/k8s/local-vol1
- nodeAffinity:
-   required:
-     nodeSelectorTerms:
-     - matchExpressions:
-       - key: kubernetes.io/hostname
-         operator: In
-         values:
-         - node1.davidhuang.top
-         - node2.davidhuang.top
-
-The default helm values for Kong will has a PersistentVolumeClaim in its Postgress image that cannot claim local 
-storage. The kong-postgress container will stuck in pending state. Fix it by 
-
-kubectl get pvc/<the default persistent volume claim for kong> -o yaml > kong-pvc.yaml
-
-Edit the yaml file to look like this. The key change is adding a storageClassName in the volume spec for the local
-storage we just added
-
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-    helm.sh/resource-policy: ""
-  creationTimestamp: 2018-12-08T06:29:04Z
-  finalizers:
-  - kubernetes.io/pvc-protection
-  labels:
-    app: postgresql
-    chart: postgresql-0.18.0
-    heritage: Tiller
-    release: vocal-poodle
-  name: vocal-poodle-postgresql
-  namespace: default
-  resourceVersion: "1102579"
-  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/vocal-poodle-postgresql
-  uid: 8ed6513c-fab2-11e8-9992-00163e0c4a4a
-spec:
-  storageClassName: local-storage
-  accessModes:
-  - ReadWriteOnce
-  dataSource: null
-  resources:
-    requests:
-      storage: 8Gi
 
 
 
