@@ -277,42 +277,63 @@ $ sudo kubeadm token create <generated token string> --print-join-command
 
 Congratulations, you've had yourself a running Kubernetes cluster with 3 master nodes and 3 worker nodes. 
 
-# Below contents are unfinished and will be changed soon.
+# Install Helm
 
-# Install and Setup Helm
+Helm is a package manager for Kubenetes applications. It is installed on your local machine and it will also install its agent `tiller` on your cluster
 
-Install on Mac following official instructions worked
+## Install on Mac
 
-curl https://raw.githubusercontent.com/helm/helm/master/scripts/get > get_helm.sh
-$ chmod 700 get_helm.sh
-$ ./get_helm.sh
-helm init
+1. Install with `brew install kubernetes-helm`
+2. Run `helm init`. Up to this point, tiller will be deployed, but will fail at container creation because it cannot get the image
+3. Prepare tiller image `gcr.io/kubernetes-helm/tiller:v2.12.1`. Use the same technique we used for our cluster: 
+   1 connect to VPN 
+   2 use docker pull, then docker save
+   3 scp to all the woker nodes,
+   4 docker load
+4. Run `scripts/__helm-init-sa.sh`. This creates the service account and binds it to the cluster-admin cluster role for `tiller`. Otherwise `tiller` cannot install  charts on the cluster
 
-Up to this point, tiller will be deploed, but will fail at container creation because it cannot get the image
+You also need VPN to download the charts from the official `stable` repo. Use `helm fetch` to get what you need into local directory. Then use `helm install ./<your_chart_file_name>`
 
-gcr.io/kubernetes-helm/tiller:v2.11.0
+# Install and get Metallb up running
 
-So use the same technique:
- - find a VPN access 
- - use docker pull, then docker save
- - scp to your host, then docker load
+## Install Metallb
 
-You also need VPN to download the charts from the official stable/ repo. Use Helm fetch to get what you need
-into local directory. Then use helm install ./your_chart_file_name
+In our experiment, we didn't provision any Aliyun load balancer because (1) cost saving (2) Kubernetes does not yet support Alyyun cloud apparatus as does AWS or GCP. Our cluster is essentially running on bare metal. Without native cloud load balancer support, we can only expose services via node port. This way we are not allowed to use privilleged ports such as http (80) or https (443). Metallb solves this problem by offering a pure software load balancer that does not rely on any cloud infrastruture. 
 
-Now set up the service account and clusterrole for tiller, or it cannot install the charts on the cluster
+To install Metallb using `helm` is very easy: `helm install stable/metallb`. But we have to do this in a more complicated way because of the GFW. 
+```
+# Get on VPN
+helm fetch stable/metallb
+helm install ./metallb
+```
 
-kubectl create serviceaccount --namespace kube-system tiller
-kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
+## Create a ConfigMap for Metallb
 
-Install nginx-ingress
+This will install Metallb into the default namespace. But Metallb will not do anything until we create a ConfigMap for it, like in the `metalllb.yaml`:
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: default
+  name: metallb-config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 172.17.94.121/32
+      - 172.17.197.158/32
+      - 172.17.94.122/32
+```
+
+Here we expose all three woker nodes' Aliyun internal IPs. Recall that workers nodes all have public EIPs. Services exposed on these internal IPs will be accessible from outside Aliyun.  
+
+# Install nginx-ingress
 
 Use Helm to install
-** Note ** after installation use kubectl edit to change the ingress controller type to NodePort and config the exposed
-http and https ports to 30080 and 30443 respectively
 
-Install Certbot 
+# Install Certbot 
 
 Go to Let's Encrypt and follow instruction on installing Cerbot and use cerbot certonly
 port 80 needs to be open for http01 verification to go through
@@ -320,36 +341,6 @@ port 80 needs to be open for http01 verification to go through
 sudo certbot certonly --standalone -d davidhuang.top -d jenkins.davidhuang.top
 Once done, kc create secret tls <name> --key privkey.pem --cert fullchain.pem
 
-
-
 use helm install
-
-## Install nginx-ingress controll
-
-The default helm nginx-ingress chart will install the ingress controller using LoadBalancer. It does not work for 
-our 3-node cluster as we don't have driver for Alibaba cloud's load balancer. 
-
-We need to install as a node port service type.
-
-```
-helm install stable/nginx-ingress \
-  --name dvd \
-  --set controller.service.type=NodePort \
-  --set controller.service.nodePorts.http=30080 \
-  --set controller.service.nodePorts.https=30443
-```
-
-Use `kubectl get svc` to verify nginx-ingress is up and running. You should see output similar to the following
-
-```
-NAME                                TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
-dvd-nginx-ingress-controller        NodePort    10.97.109.150    <none>        80:30080/TCP,443:30443/TCP   17s
-dvd-nginx-ingress-default-backend   ClusterIP   10.99.0.51       <none>        80/TCP                       17s
-```
-
-You should use your release name to replace `dvd` and your own ports to replace `30080` and `30443`, although I
-found these are pretty good, given you cannot expose port `80` and `443` when ingress is configured to use node 
-port.
-
 
 

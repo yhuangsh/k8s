@@ -2,3 +2,4 @@ certs/out/*
 kubeconfig/*
 bin/*
 bin/download/*
+charts/*
