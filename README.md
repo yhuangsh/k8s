@@ -380,27 +380,28 @@ default backend - 404
 
 ## Run a simple node js website
 
-We will now install a simple web app using an example from the book Kubernetes for Developers.
+We will now install a simple web app using an example from the book Kubernetes for Developers. I have forked the original code in order to make some changes for my experiment.
 
 1. Get the code from github
    ```
-   git clone https://githubcom/kubernetes-for-developers/kfd-nodejs
+   git clone https://githubcom/yhuangsh/kfd-nodejs
    cd kfd-nodejs
-   git checkout tags/first_container
+   git checkout first_container_branch
    ```
-2. Build the docker image for this simple application `docker build .`. This creates a docker image that runs a particular version of the web app "first_container". Don't miss the dot in the command
-3. Optional. Tag the image and push to your own repository. Aliyun offers free Kubernetes docker image registry. There are several registry address roughly matching Aliyun's regions. For example, `registry.cn-beijing.aliyuncs.com`.  In our example, we tag the newly created image with `docker tag <your image hash> yhuangsh/nodejs`. Then `docker push yhuangsh/nodejs` to push the image to my own image repository hosted on docker public registry. You may use this image directly.
-4. Run the web app on your Kubernetes cluster by `kubectl run --image=yhuangsh/nodejs --port=3000`. This starts a pod with the nodejs image we just created and a nodejs deployment. The `port` is passed to nodejs via environment variable so that the nodejs web server will listen on port 3000 rather than the normal 80 port. The port number doesn't matter since this port is inside the a docker container. 
-5. The pod is inaccessible from outside its docker container until exposed by `kubectl expose deploy/nodejs`. This exposes the web app to cluster network, still not accessible from outside world. Use `kubectl get svc` and something like the following will show up, among other things. Another way to interact with this web app is through `kubectl port-forward <you nodejs podname> --port=<your localhost port>:3000`. This is good for development, but not for a production system.
+2. Build the docker image for this simple application `docker build -t your_repository/kfd-node:version`. This creates a docker image that runs a particular version of the web app under the "first_container_branch". Don't miss the dot in the command
+3. You must push your image to an image registry for your cluser to pull and use. Aliyun offers free Kubernetes docker image registry. There are several registry addresses roughly matching Aliyun's regions. For example, `registry.cn-beijing.aliyuncs.com`.  In our example, I used `docker push yhuangsh/kfd-nodejs:v1` to push the image to my own image repository hosted on docker public registry. You may use this image directly.
+4. Run the web app on your Kubernetes cluster by `kubectl run nodejs --image=yhuangsh/kfd-nodejs:v1 --port=3000`. This starts a new pod with the `kfd-nodejs:v1` image we just created and a deployment named `nodejs`. The `port` is passed to the pod via environment variable so that the nodejs web server will listen on port 3000 rather than the normal 80 port. The port number doesn't matter since this port is inside the a docker container. 
+5. The pod is inaccessible from outside its docker container until exposed by `kubectl expose deploy/nodejs`. This exposes the web app to the cluster network, still inaccessible from outside world. Use `kubectl get svc` and something like the following will show up, among other things. 
    ```
    NAME                         TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)
    nodejs                       ClusterIP      10.111.230.152   <none>          3000/TCP
    ```
-6. In order for the nodejs web app to be available publicly, the last link is to tell nginx-ingress controller how to route http requests. Use the command `kbuectl create -f yaml/ingress.yaml`. This maps incoming traffic to the host `www.davidhuang.top` to the nodejs web app. You sure wants to use your own domain name. 
+   Another way to interact with this web app is through `kubectl port-forward <you nodejs pod name> --port=<your localhost port>:3000`. This is useful for development, but not for a production system.
+6. In order for the nodejs web app to be available publicly, the last step is to tell `nginx-ingress` controller how to route HTTP requests. Use the command `kbuectl create -f yaml/ingress.yaml`. This maps incoming traffic to the host `www.davidhuang.top` to the nodejs web app. You sure wants to use your own domain name. I also changed the original `kfd-nodejs` code so that the web app is available under `http://www.davidhuang.top/nodejs` and `http://www.davidhuang.top/nodejs/users`. This demostrates that `nginx-ingress` controller can dispatch traffic based on path as well as host's DNS names.
 
-Congratulations, you have your first web site on Kubernetes running.
+Congratulations, you have your first web site on Kubernetes cluster running.
 
-***Domain name in China***. It's easy to open 80/433 ports on Aliyun. But it's not really open until you register as an ICP (Internet Content Provider) with the authority. This takes a few days with uploading details of your personal information and the domain names that you own. Otherwise, any traffic to 80 will be hijacked by Aliyun leading to a page prompting you to register. You may think you get away with using a non-standard http port. That works until the moment you wants to set up TLS for your website with free certificates from Let's Encrypt. We get back to this in the next experiment.
+***Domain name and http (80) port in China***. It's easy to open 80/433 ports on Aliyun. But the port is not really open until you register as an ICP (Internet Content Provider) with the authority. This takes a few days and requires uploading your personal information and the domain names that you own. Otherwise, any traffic to 80 will be hijacked by Aliyun leading to a page prompting you to register. You may think you get around by using a non-standard http port. That works until the moment you wants to set up TLS for your website with free certificates from Let's Encrypt. We get to that in the next experiment.
 
 # Install cert-manager
 
