@@ -5,21 +5,15 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: dvd-ingress
+  name: davidhuang-top-ingress
 spec:
   rules:
-  - host: nodejs.davidhuang.top
+  - host: www.davidhuang.top
     http:
       paths: 
       - path: /
         backend:
           serviceName: nodejs
           servicePort: 3000
-  - host: jenkins.davidhuang.top
-    http:
-      paths: 
-      - path: /
-        backend:
-          serviceName: jenkins
-          servicePort: 8080
+
 

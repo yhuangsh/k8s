@@ -2,8 +2,9 @@
 
 This project uses a series of scripts to setup a 3-master-3-worker Kubernetes cluster on Alibaba's Aliyun Cloud using 7 standard Aliyun ECS instances. 
 
-## ECS resources used are:
+## ECS resources used
 
+This experiment uses the following Aliyun resources:
 - a0 node, bridge and working node for settting up the cluster master and worker nodes and also act as soft load balancer and reverse proxy to Kubernetes API servers running on the master
 - m0, m1, m2 nodes, master nodes running the cluster's control plane 
 - w0, w1, w2 nodes, wokers nodes running the application pods
@@ -286,10 +287,10 @@ Helm is a package manager for Kubenetes applications. It is installed on your lo
 1. Install with `brew install kubernetes-helm`
 2. Run `helm init`. Up to this point, tiller will be deployed, but will fail at container creation because it cannot get the image
 3. Prepare tiller image `gcr.io/kubernetes-helm/tiller:v2.12.1`. Use the same technique we used for our cluster: 
-   1 connect to VPN 
-   2 use docker pull, then docker save
-   3 scp to all the woker nodes,
-   4 docker load
+   1. connect to VPN 
+   2. use docker pull, then docker save
+   3. scp to all the woker nodes,
+   4. docker load
 4. Run `scripts/__helm-init-sa.sh`. This creates the service account and binds it to the cluster-admin cluster role for `tiller`. Otherwise `tiller` cannot install  charts on the cluster
 
 You also need VPN to download the charts from the official `stable` repo. Use `helm fetch` to get what you need into local directory. Then use `helm install ./<your_chart_file_name>`
@@ -331,9 +332,77 @@ Here we expose all three woker nodes' Aliyun internal IPs. Recall that workers n
 
 # Install nginx-ingress
 
-Use Helm to install
+## Install nginx-ingress with `helm`
 
-# Install Certbot 
+Use `helm` to install nginx-ingress is very easy. But `helm` will also install a default back end whose image is hosted on Google server. You should know how to deal with this by now if you've been following this article.
+```
+# Connect to VPN
+# docker pull image k8s.gcr.io/defaultbackend:1.4
+# docker save k8s.gcr.io/defaultbackend:1.4 > defaultbackend_1.4
+# scp defaultbackend_1.4 user@a0:~/k8s/bin
+# scp defaultbacnekd_1.4 user@workerhost:~/_bin
+# sudo docker load < defaultbackend_1.4>
+helm fetch stable/nginx-ingress
+# Disconnect VPN
+helm install ./nginx-ingress-1.0.1.tgz --set rbac.create=true
+```
+
+## Verify nginx-ingress installation
+
+Use `kubectl get pods` you should see something like:
+```
+NAME                                                              READY   STATUS    RESTARTS   AGE
+belligerent-rabbit-nginx-ingress-controller-56b5d67859-4tz5l      1/1     Running   0          9m37s
+belligerent-rabbit-nginx-ingress-default-backend-6c47644b585bmz   1/1     Running   0          9m37s
+terrifying-dog-metallb-controller-74b9bd949-w2726                 1/1     Running   0          10h
+terrifying-dog-metallb-speaker-kfttw                              1/1     Running   0          10h
+terrifying-dog-metallb-speaker-v5hxq                              1/1     Running   0          10h
+terrifying-dog-metallb-speaker-vlm4r                              1/1     Running   0          10h
+```
+
+If you see the defaultbackend pod shows status `ImagePullBackOff`, it means that worker node cannot pull the default backend image. After you have loaded the image, the pod will automatically resume and enter into running state.
+
+Now go to your Aliyun web console and verify if you have your 80 port open in the security group hosting your worker nodes. You need to figure out what is the public ip address to connect to the default backend. But first let's look at how the traffic will flow:
+```
+Internet --> worker public up --> worker internal ip --> metallb --> nginx-ingress --> defaultbackend
+```
+
+Recall that we have
+- 3 public IPs, one on each of the worker nodes
+- Assigned 3 internal IPs from the same set of worker nodes to Metallb
+
+Therefore Metallb must have allocated one of the 3 internal IPs (meaning which worker node) to `nginx-ingress`. To find out, use `kubectl get svc -o wide`. The IP address listed under the EXTERNAL-IP column is the internal IP used. Find the corresponding public IP and you find the IP address you'll use to access the default backend. This IP address is also the one you want to bind your domain name to. 
+
+Finally, fire up your browser and go to `http://<worker public up>`, you should see a simple line that says:
+```
+default backend - 404
+``` 
+
+## Run a simple node js website
+
+We will now install a simple web app using an example from the book Kubernetes for Developers.
+
+1. Get the code from github
+   ```
+   git clone https://githubcom/kubernetes-for-developers/kfd-nodejs
+   cd kfd-nodejs
+   git checkout tags/first_container
+   ```
+2. Build the docker image for this simple application `docker build .`. This creates a docker image that runs a particular version of the web app "first_container". Don't miss the dot in the command
+3. Optional. Tag the image and push to your own repository. Aliyun offers free Kubernetes docker image registry. There are several registry address roughly matching Aliyun's regions. For example, `registry.cn-beijing.aliyuncs.com`.  In our example, we tag the newly created image with `docker tag <your image hash> yhuangsh/nodejs`. Then `docker push yhuangsh/nodejs` to push the image to my own image repository hosted on docker public registry. You may use this image directly.
+4. Run the web app on your Kubernetes cluster by `kubectl run --image=yhuangsh/nodejs --port=3000`. This starts a pod with the nodejs image we just created and a nodejs deployment. The `port` is passed to nodejs via environment variable so that the nodejs web server will listen on port 3000 rather than the normal 80 port. The port number doesn't matter since this port is inside the a docker container. 
+5. The pod is inaccessible from outside its docker container until exposed by `kubectl expose deploy/nodejs`. This exposes the web app to cluster network, still not accessible from outside world. Use `kubectl get svc` and something like the following will show up, among other things. Another way to interact with this web app is through `kubectl port-forward <you nodejs podname> --port=<your localhost port>:3000`. This is good for development, but not for a production system.
+   ```
+   NAME                         TYPE           CLUSTER-IP       EXTERNAL-IP     PORT(S)
+   nodejs                       ClusterIP      10.111.230.152   <none>          3000/TCP
+   ```
+6. In order for the nodejs web app to be available publicly, the last link is to tell nginx-ingress controller how to route http requests. Use the command `kbuectl create -f yaml/ingress.yaml`. This maps incoming traffic to the host `www.davidhuang.top` to the nodejs web app. You sure wants to use your own domain name. 
+
+Congratulations, you have your first web site on Kubernetes running.
+
+***Domain name in China***. It's easy to open 80/433 ports on Aliyun. But it's not really open until you register as an ICP (Internet Content Provider) with the authority. This takes a few days with uploading details of your personal information and the domain names that you own. Otherwise, any traffic to 80 will be hijacked by Aliyun leading to a page prompting you to register. You may think you get away with using a non-standard http port. That works until the moment you wants to set up TLS for your website with free certificates from Let's Encrypt. We get back to this in the next experiment.
+
+# Install cert-manager
 
 Go to Let's Encrypt and follow instruction on installing Cerbot and use cerbot certonly
 port 80 needs to be open for http01 verification to go through
@@ -343,4 +412,11 @@ Once done, kc create secret tls <name> --key privkey.pem --cert fullchain.pem
 
 use helm install
 
+# Credits
 
+This project was inspired and has used ideas and methods from the following articles and website:
+
+- [UTSC Mirror](https://ieevee.com/tech/2017/09/17/k8s-yum-mirror.html)
+- [Multi-master with Kubeadm](https://blog.inkubate.io/install-and-configure-a-multi-master-kubernetes-cluster-with-kubeadm/)
+- [Kubernetes the Hard Way](https://github.com/kelseyhightower/kubernetes-the-hard-way)
+- [Weave Net FAQ](https://www.weave.works/docs/net/latest/faq/)
