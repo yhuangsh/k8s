@@ -1,0 +1,25 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: davidhuang-top-ingress
+spec:
+  tls:
+  - hosts:
+    - davidhuang.top
+    - www.davidhuang.top
+    - dev.davidhuang.top
+    secretName: davidhuang-top-prod-tls
+  rules:
+  - host: www.davidhuang.top
+    http:
+      paths: 
+      - path: /nodejs
+        backend:
+          serviceName: nodejs
+          servicePort: 3000
+
+
