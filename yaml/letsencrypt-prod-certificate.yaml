@@ -5,7 +5,7 @@ metadata:
 spec:
   secretName: davidhuang-top-prod-tls
   issuerRef:
-    name: letsencrypt-staging
+    name: letsencrypt-prod
   commonName: davidhuang.top
   dnsNames:
   - www.davidhuang.top
