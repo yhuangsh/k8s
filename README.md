@@ -405,6 +405,12 @@ Congratulations, you have your first web site on Kubernetes cluster running.
 
 # Install cert-manager
 
+## Install cert-manager via `helm`
+
+Use `helm install ./cert-manager-v0.5.2.tgz --name cert-manager` to install. Note that we install `cert-manager` to the default namespace rather than the `kube-system` namespace as the official guide instructed.
+
+## Set up ClusterIssuer
+
 Go to Let's Encrypt and follow instruction on installing Cerbot and use cerbot certonly
 port 80 needs to be open for http01 verification to go through
 
