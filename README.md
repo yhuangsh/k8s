@@ -403,21 +403,96 @@ Congratulations, you have your first web site on Kubernetes cluster running.
 
 ***Domain name and http (80) port in China***. It's easy to open 80/433 ports on Aliyun. But the port is not really open until you register as an ICP (Internet Content Provider) with the authority. This takes a few days and requires uploading your personal information and the domain names that you own. Otherwise, any traffic to 80 will be hijacked by Aliyun leading to a page prompting you to register. You may think you get around by using a non-standard http port. That works until the moment you wants to set up TLS for your website with free certificates from Let's Encrypt. We get to that in the next experiment.
 
-# Install cert-manager
+# Install cert-manager 
 
 ## Install cert-manager via `helm`
 
 Use `helm install ./cert-manager-v0.5.2.tgz --name cert-manager` to install. Note that we install `cert-manager` to the default namespace rather than the `kube-system` namespace as the official guide instructed.
 
-## Set up ClusterIssuer
+## Set up the Issuer resource
 
-Go to Let's Encrypt and follow instruction on installing Cerbot and use cerbot certonly
-port 80 needs to be open for http01 verification to go through
+First, customize the `letsencrypt-staging-issuer.yaml` and use `kubectl create -f yaml/letsencrypt-staging-issuer.yaml` to create the issuer using Let's Encrypt's ACME staging server. 
 
-sudo certbot certonly --standalone -d davidhuang.top -d jenkins.davidhuang.top
-Once done, kc create secret tls <name> --key privkey.pem --cert fullchain.pem
+Important things to note:
+1. Always use the staging server first as there is limit on how much and how frequent you can retry a certificate request if the previous one fails. You don't want have too many failures in a short period of time with the production ACME.
+2. Use `http01` as the domain verification method. Let's Encrypt does not support Aliyun, so `dns01` method won't work.
+3. In case you haven't finished the previous section and jumped here. You should know that you must finish your ICP registration before starting `http01` verification because `http01` uses 80 port to talk to a `cert-manager` web server to complete the verification process. 
 
-use helm install
+After the `kubectl create` command, use `kubectl describe issuer` to check the progress of issuer registration with Let's Encrypt's ACME server. If an ACME account is successfully registered, you should see something like:
+```
+[More ouput]
+Status:
+  Acme:
+    Uri:  https://acme-staging-v02.api.letsencrypt.org/acme/acct/7666981
+  Conditions:
+    Last Transition Time:  2018-12-24T03:30:56Z
+    Message:               The ACME account was registered with the ACME server
+    Reason:                ACMEAccountRegistered
+    Status:                True
+    Type:                  Ready
+Events:                    <none>
+```
+This means you are ready to take the next step. 
+
+## Domain verification and certificate issuing
+
+Use `kubectl create -f yaml/letsencrypt-staging-certificate.yaml` to create a certificate. This triggers `cert-manager` to 
+1. start the `http01` verification for each CN and DNS name you are requesting a certificate for 
+2. request ACME to issue certificates for thse CN and DNS names
+
+Note that `cert-manager` will complete `http01` verifications of all CN and DNS names you requested before requesting any certificate. If one of your CN or DNS name cannot be verified, no certificate will be issued and `cert-manager` will retry after a time-out. This is why you should use the staging server first. 
+
+Use `kubectl describe certificate/<certificate-name>` to track progress. The `<certificate-name>` is the `name:` you put in the `meta` block of the `letsencrypt-staging-certificate.yaml`. If successful, you should see something like:
+```
+[More output]
+Events:
+  Type    Reason          Age   From          Message
+  ----    ------          ----  ----          -------
+  Normal  CreateOrder     65s   cert-manager  Created new ACME order, attempting validation...
+  Normal  DomainVerified  41s   cert-manager  Domain "www.davidhuang.top" verified with "http-01" validation
+  Normal  DomainVerified  10s   cert-manager  Domain "dev.davidhuang.top" verified with "http-01" validation
+```
+Here you can see `www.davidhuang.top` and `dev.davidhuang.top` have been validated.
+
+Now use `kubectl describe cert/<certificate-name>` to confirm if a certificate has been issued. A sample output of an issued certificate looks like this:
+```
+[More output]
+Status:
+  Acme:
+    Order:
+      URL:  https://acme-v02.api.letsencrypt.org/acme/order/48273452/236826555
+  Conditions:
+    Last Transition Time:  2018-12-24T06:58:23Z
+    Message:               Certificate issued successfully
+    Reason:                CertIssued
+    Status:                True
+    Type:                  Ready
+```
+
+## Find what you need to set up a TLS connection
+
+Use `kubectl get secret` to find out the secret you need for setting up your TLS connection. Here's an example.
+```
+NAME                                            TYPE                                  DATA   AGE
+belligerent-rabbit-nginx-ingress-token-n5wn6    kubernetes.io/service-account-token   3      36h
+cert-manager-token-k872m                        kubernetes.io/service-account-token   3      11h
+davidhuang-top-prod-tls                         kubernetes.io/tls                     2      7h33m
+default-token-8hfn4                             kubernetes.io/service-account-token   3      2d23h
+letsencrypt-prod                                Opaque                                1      7h37m
+letsencrypt-staging                             Opaque                                1      11h
+terrifying-dog-metallb-controller-token-662qx   kubernetes.io/service-account-token   3      46h
+terrifying-dog-metallb-speaker-token-k2zn8      kubernetes.io/service-account-token   3      46h
+```
+
+The third line with `davidhuang-top-prod-tls` is the one we are looking for. In fact, this is the `secretName` you specified in your certificate yaml file. 
+
+Note that `cert-manager` also created `letsencrypt-prod` and `letsencrypt-staging` of type `Opaque` for the issuers. We don't care about that, but make sure you are not confused. 
+
+# Secure our web app with TLS
+
+Use `kubectl delete ingress/davidhuang-top-ingress` since we will set up the TLS-enabled ingress with the same name. Use `kubectl create -f yaml/ingress-tls.yaml`.
+
+Now go to your browser and refresh. You should see the same web site, but your browser should show a lock sign somewhere near your URL. `nginx-ingress` by default will redirect HTTP request to HTTPS if a domain names appears under the `tls` section. 
 
 # Credits
 

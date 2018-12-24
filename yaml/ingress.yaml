@@ -11,7 +11,7 @@ spec:
   - host: www.davidhuang.top
     http:
       paths: 
-      - path: /
+      - path: /nodejs
         backend:
           serviceName: nodejs
           servicePort: 3000
