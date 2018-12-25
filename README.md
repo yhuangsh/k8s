@@ -494,6 +494,10 @@ Use `kubectl delete ingress/davidhuang-top-ingress` since we will set up the TLS
 
 Now go to your browser and refresh. You should see the same web site, but your browser should show a lock sign somewhere near your URL. `nginx-ingress` by default will redirect HTTP request to HTTPS if a domain names appears under the `tls` section. 
 
+# Install Jenkins
+
+Use `helm inspect values ./jenkins-0.25.0.tgz > jenkins-values.yaml` 
+
 # Credits
 
 This project was inspired and has used ideas and methods from the following articles and website:
