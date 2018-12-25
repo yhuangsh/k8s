@@ -21,5 +21,9 @@ spec:
         backend:
           serviceName: nodejs
           servicePort: 3000
+      - path: /jenkins
+        backend: 
+          serviceName: jenkins
+          servicePort: 8080
 
 
