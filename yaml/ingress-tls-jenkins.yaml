@@ -21,6 +21,12 @@ spec:
         backend:
           serviceName: nodejs
           servicePort: 3000
-
+  - host: dev.davidhuang.top
+    http:
+      paths:
+      - path: /jenkins
+        backend: 
+          serviceName: jenkins
+          servicePort: 8080
 
 
