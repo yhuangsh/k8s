@@ -523,6 +523,10 @@ By now your Jenkins master is up running but is confined within the cluster if y
 
 Do a diff between `ingress-tls-jenkins.yaml` and `ingress-tls.yaml`. It's really easy. Also note that we use `/jenkins` as the path under `dev.davidhuang.top` so that the Jenkins URL from external perspective becomes `https//dev.davidhuang.top/jenkins`. For me, this saves my time because I don't have to add another DNS name and its certificate for Jenkins or for any other service I will add later. Use the method that suits you best. 
 
+## Solve the "It appears that your reverse proxy set up is broken"
+
+Since the Jenkins service is already accessible from external with our ingress. The only you need to do to eliminate this warning is to go to Jenkins's dashboard, Manager Jenkins, Configure System, Jenkins Location, Jenkins URL. There you fill in the root URL you use from external. Refresh the page and the warning will go away.
+
 # Credits
 
 This project was inspired and has used ideas and methods from the following articles and website:
